@@ -70,13 +70,14 @@ for gid, values in data.items():
 print("Statistics calculated:", time.ctime())  # Track progress
 
 # Before adding fields, create a list of field names to be added to the table
-field_names = ["GID"]  # Start with GID which is always present
+unique_hydgrpdcds = set(hydgrpdcd for gid in results for hydgrpdcd in results[gid]['hydgrpdcd_percentages'])
+
+# Update field names list to include the desired field names
+field_names = ["GID", "OtherSoilType"]  # Start with GID and OtherSoilType
 for hydgrpdcd in unique_hydgrpdcds:
-    if hydgrpdcd == 'OtherSoilType':
-        field_names.append(hydgrpdcd)  # Directly use 'OtherSoilType' without any suffix
-    else:
-        field_names.append(f"{hydgrpdcd}_perc")  # Append '_perc' suffix for other types
-field_names.append("ksat_weighted")  # Add 'ksat_weighted' field
+    if hydgrpdcd != 'OtherSoilType':
+        field_names.append(f"SoilType_{hydgrpdcd.replace('SoilType_', '')}")  # Remove SoilType_ prefix for other types
+field_names.append("ksat_weighted")  # Add ksat_weighted field
 
 # Now, use these field names when creating fields and inserting data
 for field_name in field_names[1:]:  # Skip 'GID' as it's already added
@@ -89,10 +90,12 @@ with arcpy.da.InsertCursor(table_path, field_names) as cursor:
     for gid, stats in results.items():
         row = [gid]
         for hydgrpdcd in unique_hydgrpdcds:
-            if hydgrpdcd == 'OtherSoilType':
-                row.append(stats['hydgrpdcd_percentages'].get(hydgrpdcd, 0))
+            if hydgrpdcd == ' ':
+                row.append(stats['hydgrpdcd_percentages'].get(hydgrpdcd, 0))  # 'OtherSoilType'
             else:
-                row.append(stats['hydgrpdcd_percentages'].get(hydgrpdcd, 0))
+                # Remove "SoilType_" prefix for all soil types except 'OtherSoilType'
+                soil_type = hydgrpdcd.replace("SoilType_", "")
+                row.append(stats['hydgrpdcd_percentages'].get(soil_type, 0))
         row.append(stats['ksat_weighted_sum'])  # Add ksat_weighted sum for each GID
         cursor.insertRow(row)
 
