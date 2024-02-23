@@ -118,6 +118,9 @@ with arcpy.da.InsertCursor(final_output_table, ["GID", "PrecFr10yr", "PrecFr2yr"
         with arcpy.da.SearchCursor(output_point_shapefile, ["GID", "Atlas14_10", "Atlas14_2y"], where_clause=f"GID = '{gid}'") as search_cursor:
             for row in search_cursor:
                 gid, prec_fr_10yr, prec_fr_2yr = row
+                # Divide the values by 1000
+                prec_fr_10yr /= 1000
+                prec_fr_2yr /= 1000
                 break  # Assuming there's only one record per GID
         
         # Insert values into the final_output_table
