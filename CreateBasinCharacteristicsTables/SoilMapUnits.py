@@ -14,7 +14,7 @@ output_folder = arcpy.GetParameterAsText(2)      # Output folder for gdb and tem
 print("Start:", time.ctime())  # Track progress
 
 # Create output geodatabase and temp folder
-gdb_name = "OutputGDB.gdb"
+gdb_name = "Soil.gdb"
 gdb_path = os.path.join(output_folder, gdb_name)
 temp_folder = os.path.join(output_folder, "soil_temp")
 
@@ -69,21 +69,31 @@ for gid, values in data.items():
 
 print("Statistics calculated:", time.ctime())  # Track progress
 
-# Add necessary fields to the table for each hydgrpdcd found in the dataset
-unique_hydgrpdcds = set(hydgrpdcd for gid in results for hydgrpdcd in results[gid]['hydgrpdcd_percentages'])
+# Before adding fields, create a list of field names to be added to the table
+field_names = ["GID"]  # Start with GID which is always present
 for hydgrpdcd in unique_hydgrpdcds:
     if hydgrpdcd == 'OtherSoilType':
-        arcpy.AddField_management(table_path, hydgrpdcd, "DOUBLE")
+        field_names.append(hydgrpdcd)  # Directly use 'OtherSoilType' without any suffix
     else:
-        arcpy.AddField_management(table_path, f"{hydgrpdcd}_perc", "DOUBLE")
-arcpy.AddField_management(table_path, "ksat_weighted", "DOUBLE")
+        field_names.append(f"{hydgrpdcd}_perc")  # Append '_perc' suffix for other types
+field_names.append("ksat_weighted")  # Add 'ksat_weighted' field
+
+# Now, use these field names when creating fields and inserting data
+for field_name in field_names[1:]:  # Skip 'GID' as it's already added
+    arcpy.AddField_management(table_path, field_name, "DOUBLE")
 
 print("Fields added to table:", time.ctime())  # Track progress
 
 # Populate the table
-with arcpy.da.InsertCursor(table_path, ["GID"] + [f"{hydgrpdcd}_perc" if hydgrpdcd != 'OtherSoilType' else hydgrpdcd for hydgrpdcd in unique_hydgrpdcds] + ["ksat_weighted"]) as cursor:
+with arcpy.da.InsertCursor(table_path, field_names) as cursor:
     for gid, stats in results.items():
-        row = [gid] + [stats['hydgrpdcd_percentages'].get(hydgrpdcd, 0) for hydgrpdcd in unique_hydgrpdcds] + [stats['ksat_weighted_sum']]
+        row = [gid]
+        for hydgrpdcd in unique_hydgrpdcds:
+            if hydgrpdcd == 'OtherSoilType':
+                row.append(stats['hydgrpdcd_percentages'].get(hydgrpdcd, 0))
+            else:
+                row.append(stats['hydgrpdcd_percentages'].get(hydgrpdcd, 0))
+        row.append(stats['ksat_weighted_sum'])  # Add ksat_weighted sum for each GID
         cursor.insertRow(row)
 
 print("Table populated with data:", time.ctime())  # Track progress
