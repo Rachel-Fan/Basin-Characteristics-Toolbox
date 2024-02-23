@@ -7,9 +7,15 @@ from collections import defaultdict
 arcpy.env.overwriteOutput = True
 
 # Inputs
+'''
 soil_map_units_shp = arcpy.GetParameterAsText(0)  # 'SoilMapUnits.shp'
 basins_list_shp = arcpy.GetParameterAsText(1)    # 'basins_list.shp'
 output_folder = arcpy.GetParameterAsText(2)      # Output folder for gdb and temp files
+'''
+
+soil_map_units_shp = r'U:\1937\193709666\03_data\gis_cad\gis\Basin_Characteristics\SourceData\SoilsMapUnits\Soils_1025.shp'  # 'SoilMapUnits.shp'
+basins_list_shp = r'U:\1937\193709666\03_data\gis_cad\gis\Basin_Characteristics_Testing\Testing_Dataset\PreProcessing_1025\basins_final_merge.shp'    # 'basins_list.shp'
+output_folder = r'U:\1937\193709666\03_data\gis_cad\gis\Basin_Characteristics_Testing\Testing_Dataset\Soil'
 
 print("Start:", time.ctime())  # Track progress
 
@@ -68,15 +74,18 @@ for gid, values in data.items():
     results[gid] = {'hydgrpdcd_percentages': hydgrpdcd_percentages, 'ksat_weighted_sum': ksat_weighted_sum}
 
 print("Statistics calculated:", time.ctime())  # Track progress
+print("Results are", results)
 
 # Before adding fields, create a list of field names to be added to the table
 unique_hydgrpdcds = set(hydgrpdcd for gid in results for hydgrpdcd in results[gid]['hydgrpdcd_percentages'])
 
 # Update field names list to include the desired field names
 field_names = ["GID", "OtherSoilType"]  # Start with GID and OtherSoilType
+print("unique_hydgrpdcds are", unique_hydgrpdcds)
 for hydgrpdcd in unique_hydgrpdcds:
-    if hydgrpdcd != 'OtherSoilType':
-        field_names.append(f"SoilType_{hydgrpdcd.replace('SoilType_', '')}")  # Remove SoilType_ prefix for other types
+    if hydgrpdcd != ' ':
+        field_name = f"SoilType_{hydgrpdcd.replace('SoilType_', '').replace('/','_')}"
+        field_names.append(field_name)  # Remove SoilType_ prefix for other types
 field_names.append("ksat_weighted")  # Add ksat_weighted field
 
 # Now, use these field names when creating fields and inserting data
@@ -84,6 +93,7 @@ for field_name in field_names[1:]:  # Skip 'GID' as it's already added
     arcpy.AddField_management(table_path, field_name, "DOUBLE")
 
 print("Fields added to table:", time.ctime())  # Track progress
+print("field_names are", field_names)
 
 # Populate the table
 with arcpy.da.InsertCursor(table_path, field_names) as cursor:
