@@ -27,6 +27,7 @@ if not arcpy.Exists(national_wetlands_table):
     arcpy.AddField_management(national_wetlands_table, "GID", "LONG")
     arcpy.AddField_management(national_wetlands_table, "Wetlands_Percentage", "DOUBLE")
     arcpy.AddField_management(national_wetlands_table, "Lakes_and_Ponds_Percentage", "DOUBLE")
+print("national_wetlands_table is created")
 
 # Create a dictionary to store the total area of each basin
 basin_area_dict = {}
@@ -36,6 +37,8 @@ with arcpy.da.SearchCursor(basin_shapefile, ["GID", "TDA_SqMi"]) as cursor:
     for row in cursor:
         gid, area = row
         basin_area_dict[gid] = area
+print(basin_area_dict)
+
 
 # Create insert cursor for NationalWetlands table
 insert_fields = ["GID", "Wetlands_Percentage", "Lakes_and_Ponds_Percentage"]
