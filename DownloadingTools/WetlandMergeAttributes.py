@@ -2,9 +2,9 @@ import arcpy
 import os
 
 # Set input and output paths
-basin_shapefile = "path/to/basin_final_merge.shp"
-wetland_shapefile = "path/to/WETLAND.shp"
-output_folder = "path/to/output_folder"
+basin_shapefile = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\HUC4_Split\1025.shp"
+wetland_shapefile = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Wetland_Local\1025.shp"
+output_folder = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Wetland_Tool"
 
 # Create subfolder 'Wetland' if it doesn't exist
 wetland_folder = os.path.join(output_folder, "Wetland")
@@ -16,9 +16,9 @@ temp_folder = os.path.join(wetland_folder, "temp")
 if not os.path.exists(temp_folder):
     os.makedirs(temp_folder)
 
-gdb_path = os.path.join(temp_folder, "wetland.gdb")
+gdb_path = os.path.join(wetland_folder, "wetland.gdb")
 if not arcpy.Exists(gdb_path):
-    arcpy.CreateFileGDB_management(temp_folder, "wetland.gdb")
+    arcpy.CreateFileGDB_management(wetland_folder, "wetland.gdb")
 
 # Create NationalWetlands table
 national_wetlands_table = os.path.join(gdb_path, "NationalWetlands")
