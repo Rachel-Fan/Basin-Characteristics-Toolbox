@@ -60,3 +60,7 @@ for filename in os.listdir(input_folder):
         print(f"Processed: {filename}")
 
 print("All shapefiles processed.")
+
+print("Tool done at:")
+current_time = time.strftime("%m-%d %X",time.localtime())
+print(current_time)

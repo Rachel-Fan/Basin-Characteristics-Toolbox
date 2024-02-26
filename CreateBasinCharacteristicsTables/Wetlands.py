@@ -12,37 +12,63 @@ arcpy.CheckOutExtension("Spatial")
 # Enable overwriting of output files
 arcpy.env.overwriteOutput = True
 
-def batch_clip(basin_shapefile, wetland_shapefile, output_folder):
-    # Create temp folder
-    temp_folder = os.path.join(output_folder, "WetlandByBasin")
-    if not os.path.exists(temp_folder):
-        os.makedirs(temp_folder)
-        print('WetlandByBasin create at', temp_folder)
-    
-    # Clip wetland_shapefile by each record in basin_shapefile
-    with arcpy.da.SearchCursor(basin_shapefile, ["GID"]) as cursor:
-        for row in cursor:
-            
-            gid = row[0]
-            print(f"Start clipping wetland for GID {gid}")
-            output_shapefile = os.path.join(temp_folder, f"{gid}_wetland.shp")
-            arcpy.Clip_analysis(wetland_shapefile, basin_shapefile, output_shapefile)
-            print(f"Clipped wetland for GID {gid}")
 
-            # Run Select By Attribute and dissolve based on conditions
-            wetlands_output = os.path.join(temp_folder, f"{gid}_wetlands_dissolved.shp")
-            arcpy.Select_analysis(output_shapefile, wetlands_output, "WETLAND_TY LIKE '%Wetland%'")
-            arcpy.Dissolve_management(output_shapefile, wetlands_output)
-            print(f"Wetland dissolved for GID {gid}")
+def batch_clip(basin_shapefile, input_clip_polygon, output_directory):
+    """
+    Clips an input ecoregion shapefile using each polygon in an input clip polygon shapefile.
+    Creates a clipped shapefile for each polygon based on its GID.
+    """
+    # Set the workspace to the directory of the input ecoregion shapefile
+    arcpy.env.workspace = os.path.dirname(basin_shapefile)
+    
+    # Ensure the output directory exists
+    if not os.path.exists(output_directory):
+        os.makedirs(output_directory)
+    
+    
+    
+    # Create a feature layer from the clip polygon shapefile
+    clip_polygon_layer = "clip_polygon_layer"
+    arcpy.MakeFeatureLayer_management(input_clip_polygon, clip_polygon_layer)
+    
+    # Iterate over each polygon in the clip layer using its GID to define output filenames
+    with arcpy.da.SearchCursor(clip_polygon_layer, ["GID"]) as cursor:
+        for row in cursor:
+            gage_id = row[0]
+            query = f"GID = '{gage_id}'"
+            arcpy.SelectLayerByAttribute_management(clip_polygon_layer, "NEW_SELECTION", query)
             
-            # Run Select By Attribute and dissolve based on conditions
-            lakes_ponds_output = os.path.join(temp_folder, f"{gid}_lakes_ponds_dissolved.shp")
-            arcpy.Select_analysis(output_shapefile, lakes_ponds_output, "WETLAND_TY LIKE '%Lake%' OR WETLAND_TY LIKE '%Pond%'")
-            arcpy.Dissolve_management(output_shapefile, lakes_ponds_output)
-            print(f"Lakes and ponds dissolved for GID {gid}")
-            
+            output_shapefile = os.path.join(clip_subfolder, f"{gage_id}_Wetland.shp")
+            arcpy.analysis.Clip(basin_shapefile, clip_polygon_layer, output_shapefile)
+            print(f"Clipped and saved: {output_shapefile}")
+    
+    arcpy.SelectLayerByAttribute_management(clip_polygon_layer, "CLEAR_SELECTION")
+    print("Batch clipping completed.")
+    
+def batch_dissolve(input_folder, output_folder):
+    """
+    Dissolves the 'TYPE' field of shapefiles in the input folder and saves the results in the output folder.
+    """
+    try:
+                
+        # Get list of shapefiles in input folder
+        shapefiles = [f for f in os.listdir(input_folder) if f.endswith(".shp")]
         
-    print("Process completed successfully.")
+        # Iterate over each shapefile in the input folder
+        for shapefile in shapefiles:
+            # Construct input and output paths
+            input_shapefile = os.path.join(input_folder, shapefile)
+            output_shapefile = os.path.join(output_folder, f"{os.path.splitext(shapefile)[0]}_dissolved.shp")
+            
+            # Perform dissolve
+            arcpy.management.Dissolve(input_shapefile, output_shapefile, "TYPE")
+            print(f"Dissolved and saved: {output_shapefile}")
+    
+    except arcpy.ExecuteError:
+        arcpy.AddError(arcpy.GetMessages(2))
+    except Exception as e:
+        arcpy.AddError(str(e))
+
 
 
 basin_shapefile = r"Z:\NE_Basin\Basin_Characteristics\PreProcessing_1027\basins_final_merge.shp"
@@ -51,5 +77,14 @@ output_folder = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Wetla
 
 print("Input read. Start processing.")    
     
-# Usage
-batch_clip(basin_shapefile, wetland_shapefile, output_folder)
+# Create output subfolder if it doesn't exist
+clip_subfolder = os.path.join(output_folder, "dissolve")
+if not os.path.exists(clip_subfolder):
+    os.makedirs(clip_subfolder)
+batch_clip(basin_shapefile, wetland_shapefile, clip_subfolder)
+
+# Create output subfolder if it doesn't exist
+dissolve_subfolder = os.path.join(output_folder, "dissolve")
+if not os.path.exists(dissolve_subfolder):
+    os.makedirs(dissolve_subfolder)
+batch_dissolve(clip_subfolder,dissolve_subfolder)
