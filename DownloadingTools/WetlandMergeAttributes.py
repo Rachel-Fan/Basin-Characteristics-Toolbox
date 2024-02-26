@@ -28,27 +28,39 @@ if not arcpy.Exists(national_wetlands_table):
     arcpy.AddField_management(national_wetlands_table, "Wetlands_Percentage", "DOUBLE")
     arcpy.AddField_management(national_wetlands_table, "Lakes_and_Ponds_Percentage", "DOUBLE")
 
-# Calculate area of basin_final_merge.shp
-basin_area = 0
-with arcpy.da.SearchCursor(basin_shapefile, ["SHAPE@AREA"]) as cursor:
-    for row in cursor:
-        basin_area += row[0]
+# Create a dictionary to store the total area of each basin
+basin_area_dict = {}
 
-# Calculate area of Wetlands and Lakes_and_Ponds for each basin
-with arcpy.da.UpdateCursor(national_wetlands_table, ["GID", "Wetlands_Percentage", "Lakes_and_Ponds_Percentage"]) as cursor:
+# Read the "TDA_SqMi" field from basin_final_merge.shp to calculate total area for each basin
+with arcpy.da.SearchCursor(basin_shapefile, ["GID", "TDA_SqMi"]) as cursor:
     for row in cursor:
-        gid = row[0]
-        wetlands_area = 0
-        lakes_and_ponds_area = 0
-        with arcpy.da.SearchCursor(wetland_shapefile, ["WETLAND_TY", "ACRES"], f"GID = {gid}") as wetland_cursor:
-            for wetland_row in wetland_cursor:
-                if "Wetland" in wetland_row[0]:
-                    wetlands_area += wetland_row[1]
-                elif "Pond" in wetland_row[0] or "Lake" in wetland_row[0]:
-                    lakes_and_ponds_area += wetland_row[1]
+        gid, area = row
+        basin_area_dict[gid] = area
 
-        row[1] = (wetlands_area / basin_area) * 100
-        row[2] = (lakes_and_ponds_area / basin_area) * 100
-        cursor.updateRow(row)
+# Create insert cursor for NationalWetlands table
+insert_fields = ["GID", "Wetlands_Percentage", "Lakes_and_Ponds_Percentage"]
+insert_cursor = arcpy.da.InsertCursor(national_wetlands_table, insert_fields)
+
+# Iterate over each basin
+for gid, basin_area in basin_area_dict.items():
+    wetlands_area = 0
+    lakes_and_ponds_area = 0
+    
+    # Calculate total wetlands and lakes/ponds area for the current basin
+    with arcpy.da.SearchCursor(wetland_shapefile, ["GID", "WETLAND_TY", "Area_SqMi"], f"GID = {gid}") as wetland_cursor:
+        for wetland_row in wetland_cursor:
+            if "Wetland" in wetland_row[1]:
+                wetlands_area += wetland_row[2]
+            elif "Pond" in wetland_row[1] or "Lake" in wetland_row[1]:
+                lakes_and_ponds_area += wetland_row[2]
+
+    # Calculate percentages
+    wetlands_percentage = (wetlands_area / basin_area) * 100
+    lakes_and_ponds_percentage = (lakes_and_ponds_area / basin_area) * 100
+    
+    # Insert values into NationalWetlands table
+    insert_cursor.insertRow((gid, wetlands_percentage, lakes_and_ponds_percentage))
+
+del insert_cursor
 
 print("Process completed successfully.")
