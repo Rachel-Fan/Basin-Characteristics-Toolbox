@@ -12,44 +12,51 @@ arcpy.CheckOutExtension("Spatial")
 # Enable overwriting of output files
 arcpy.env.overwriteOutput = True
 
-def batch_clip(basin_shapefile, wetland_shapefile, output_folder):
-    # Create temp folder
-    temp_folder = os.path.join(output_folder, "WetlandByBasin")
-    if not os.path.exists(temp_folder):
-        os.makedirs(temp_folder)
-        print('WetlandByBasin create at', temp_folder)
-    
-    # Clip wetland_shapefile by each record in basin_shapefile
-    with arcpy.da.SearchCursor(basin_shapefile, ["GID"]) as cursor:
-        for row in cursor:
-            
-            gid = row[0]
-            print(f"Start clipping wetland for GID {gid}")
-            output_shapefile = os.path.join(temp_folder, f"{gid}_wetland.shp")
-            arcpy.Clip_analysis(wetland_shapefile, basin_shapefile, output_shapefile)
-            print(f"Clipped wetland for GID {gid}")
+# Set input and output folders
+input_folder = r"path\to\input\folder"
+output_folder = r"path\to\output\folder"
 
-            # Run Select By Attribute and dissolve based on conditions
-            wetlands_output = os.path.join(temp_folder, f"{gid}_wetlands_dissolved.shp")
-            arcpy.Select_analysis(output_shapefile, wetlands_output, "WETLAND_TY LIKE '%Wetland%'")
-            arcpy.Dissolve_management(output_shapefile, wetlands_output)
-            print(f"Wetland dissolved for GID {gid}")
-            
-            # Run Select By Attribute and dissolve based on conditions
-            lakes_ponds_output = os.path.join(temp_folder, f"{gid}_lakes_ponds_dissolved.shp")
-            arcpy.Select_analysis(output_shapefile, lakes_ponds_output, "WETLAND_TY LIKE '%Lake%' OR WETLAND_TY LIKE '%Pond%'")
-            arcpy.Dissolve_management(output_shapefile, lakes_ponds_output)
-            print(f"Lakes and ponds dissolved for GID {gid}")
-            
-        
-    print("Process completed successfully.")
+# Set the coordinate system
+output_coordinate_system = arcpy.SpatialReference(26852)  # WKID 26852 for NAD83 StatePlane Nebraska FIPS 2600
 
+# Create the 'reproject' folder if it doesn't exist
+reproject_folder = os.path.join(output_folder, "reproject")
+if not os.path.exists(reproject_folder):
+    os.makedirs(reproject_folder)
 
-basin_shapefile = r"Z:\NE_Basin\Basin_Characteristics\PreProcessing_1027\basins_final_merge.shp"
-wetland_shapefile = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Wetland_Local\Wetland_1027.shp"
-output_folder = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Wetland_Tool"
+# Iterate through each shapefile in the input folder
+for filename in os.listdir(input_folder):
+    if filename.endswith(".shp"):
+        # Define the full paths
+        input_shapefile = os.path.join(input_folder, filename)
+        output_shapefile = os.path.join(reproject_folder, filename)
 
-print("Input read. Start processing.")    
-    
-# Usage
-batch_clip(basin_shapefile, wetland_shapefile, output_folder)
+        # Step 1: Run Delete Identical
+        arcpy.DeleteIdentical_management(input_shapefile, ["Acres"])
+
+        # Step 2: Reproject the shapefile
+        arcpy.management.Project(input_shapefile, output_shapefile, output_coordinate_system)
+
+        # Step 3: Remove records based on WETLAND_TY field
+        with arcpy.da.UpdateCursor(output_shapefile, ["WETLAND_TY"]) as cursor:
+            for row in cursor:
+                if not any(word in row[0] for word in ["Wetland", "Lake", "Pond"]):
+                    cursor.deleteRow()
+
+        # Step 4: Add a new field "Type" and populate it based on WETLAND_TY
+        arcpy.AddField_management(output_shapefile, "Type", "TEXT")
+        with arcpy.da.UpdateCursor(output_shapefile, ["WETLAND_TY", "Type"]) as cursor:
+            for row in cursor:
+                if "Wetland" in row[0]:
+                    row[1] = "Wetland"
+                elif "Lake" in row[0] or "Pond" in row[0]:
+                    row[1] = "LakePond"
+                cursor.updateRow(row)
+
+        # Step 5: Remove Attribute and ACRES fields
+        fields_to_delete = ["Attribute", "ACRES"]
+        arcpy.DeleteField_management(output_shapefile, fields_to_delete)
+
+        print(f"Processed: {filename}")
+
+print("All shapefiles processed.")

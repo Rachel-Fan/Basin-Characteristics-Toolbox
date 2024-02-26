@@ -1,94 +1,55 @@
 import arcpy
 import os
+import time
 
-class WetlandToolbox(object):
-    def __init__(self):
-        self.label = "Wetland Toolbox"
-        self.description = "A toolbox for processing wetland data"
-        self.canRunInBackground = False
+print("Tool starts")
+current_time = time.strftime("%m-%d %X",time.localtime())
+print(current_time)
 
-    def getParameterInfo(self):
-        # Input parameters
-        basin_param = arcpy.Parameter(
-            displayName="Input Basin Shapefile",
-            name="basin_shp",
-            datatype="DEShapefile",
-            parameterType="Required",
-            direction="Input")
 
-        wetland_param = arcpy.Parameter(
-            displayName="Input Wetland Shapefile",
-            name="wetland_shp",
-            datatype="DEShapefile",
-            parameterType="Required",
-            direction="Input")
+# Check Spatial Analyst extension
+arcpy.CheckOutExtension("Spatial")
+# Enable overwriting of output files
+arcpy.env.overwriteOutput = True
 
-        output_folder_param = arcpy.Parameter(
-            displayName="Output Folder",
-            name="output_folder",
-            datatype="DEFolder",
-            parameterType="Required",
-            direction="Input")
+def batch_clip(basin_shapefile, wetland_shapefile, output_folder):
+    # Create temp folder
+    temp_folder = os.path.join(output_folder, "WetlandByBasin")
+    if not os.path.exists(temp_folder):
+        os.makedirs(temp_folder)
+        print('WetlandByBasin create at', temp_folder)
+    
+    # Clip wetland_shapefile by each record in basin_shapefile
+    with arcpy.da.SearchCursor(basin_shapefile, ["GID"]) as cursor:
+        for row in cursor:
+            
+            gid = row[0]
+            print(f"Start clipping wetland for GID {gid}")
+            output_shapefile = os.path.join(temp_folder, f"{gid}_wetland.shp")
+            arcpy.Clip_analysis(wetland_shapefile, basin_shapefile, output_shapefile)
+            print(f"Clipped wetland for GID {gid}")
 
-        return [basin_param, wetland_param, output_folder_param]
+            # Run Select By Attribute and dissolve based on conditions
+            wetlands_output = os.path.join(temp_folder, f"{gid}_wetlands_dissolved.shp")
+            arcpy.Select_analysis(output_shapefile, wetlands_output, "WETLAND_TY LIKE '%Wetland%'")
+            arcpy.Dissolve_management(output_shapefile, wetlands_output)
+            print(f"Wetland dissolved for GID {gid}")
+            
+            # Run Select By Attribute and dissolve based on conditions
+            lakes_ponds_output = os.path.join(temp_folder, f"{gid}_lakes_ponds_dissolved.shp")
+            arcpy.Select_analysis(output_shapefile, lakes_ponds_output, "WETLAND_TY LIKE '%Lake%' OR WETLAND_TY LIKE '%Pond%'")
+            arcpy.Dissolve_management(output_shapefile, lakes_ponds_output)
+            print(f"Lakes and ponds dissolved for GID {gid}")
+            
+        
+    print("Process completed successfully.")
 
-    def execute(self, parameters, messages):
-        # Get parameters
-        basin_shp = parameters[0].valueAsText
-        wetland_shp = parameters[1].valueAsText
-        output_folder = parameters[2].valueAsText
 
-        # Create subfolder 'Wetland'
-        wetland_folder = os.path.join(output_folder, 'Wetland')
-        if not os.path.exists(wetland_folder):
-            os.makedirs(wetland_folder)
+basin_shapefile = r"Z:\NE_Basin\Basin_Characteristics\PreProcessing_1027\basins_final_merge.shp"
+wetland_shapefile = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Wetland_Local\Wetland_1027.shp"
+output_folder = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Wetland_Tool"
 
-        # Create temp folder and gdb named 'wetland' under subfolder 'Wetland'
-        temp_folder = os.path.join(wetland_folder, 'temp')
-        if not os.path.exists(temp_folder):
-            os.makedirs(temp_folder)
-
-        gdb_path = os.path.join(temp_folder, 'wetland.gdb')
-        if not arcpy.Exists(gdb_path):
-            arcpy.CreateFileGDB_management(temp_folder, 'wetland.gdb')
-
-        # Create NationalWetlands table
-        national_wetlands_table = os.path.join(gdb_path, 'NationalWetlands')
-        if not arcpy.Exists(national_wetlands_table):
-            arcpy.CreateTable_management(gdb_path, 'NationalWetlands')
-            arcpy.AddField_management(national_wetlands_table, 'GID', 'LONG')
-            arcpy.AddField_management(national_wetlands_table, 'Wetlands', 'DOUBLE')
-            arcpy.AddField_management(national_wetlands_table, 'Lakes_and_Ponds', 'DOUBLE')
-
-        # Process wetland data and populate NationalWetlands table
-        with arcpy.da.SearchCursor(basin_shp, ['GID', 'SHAPE@AREA']) as cursor:
-            for row in cursor:
-                gid = row[0]
-                basin_area = row[1]
-                wetland_area = 0
-                lake_pond_area = 0
-                
-                # Calculate wetland and lake/pond area within each basin
-                with arcpy.da.SearchCursor(wetland_shp, ['WETLAND_TY', 'SHAPE@AREA'], f'GID={gid}') as wcursor:
-                    for wrow in wcursor:
-                        area = wrow[1]
-                        if wrow[0] == 'wetland':
-                            wetland_area += area
-                        elif wrow[0] == 'lake and pond':
-                            lake_pond_area += area
-                
-                # Calculate percentages
-                wetlands_percentage = (wetland_area / basin_area) * 100
-                lakes_ponds_percentage = (lake_pond_area / basin_area) * 100
-
-                # Insert data into NationalWetlands table
-                with arcpy.da.InsertCursor(national_wetlands_table, ['GID', 'Wetlands', 'Lakes_and_Ponds']) as icursor:
-                    icursor.insertRow((gid, wetlands_percentage, lakes_ponds_percentage))
-
-        arcpy.AddMessage("Process completed successfully.")
-
-if __name__ == "__main__":
-    # Execute the tool
-    tool = WetlandToolbox()
-    arcpy.AddMessage("Tool initialized successfully.")
-    tool.execute(arcpy.GetParameterInfo())
+print("Input read. Start processing.")    
+    
+# Usage
+batch_clip(basin_shapefile, wetland_shapefile, output_folder)
