@@ -13,20 +13,15 @@ arcpy.CheckOutExtension("Spatial")
 arcpy.env.overwriteOutput = True
 
 
-def batch_clip(basin_shapefile, input_clip_polygon, output_directory):
+def batch_clip(input_wetland, input_clip_polygon, output_directory):
     """
     Clips an input ecoregion shapefile using each polygon in an input clip polygon shapefile.
     Creates a clipped shapefile for each polygon based on its GID.
     """
     # Set the workspace to the directory of the input ecoregion shapefile
-    arcpy.env.workspace = os.path.dirname(basin_shapefile)
-    
-    # Ensure the output directory exists
-    if not os.path.exists(output_directory):
-        os.makedirs(output_directory)
-    
-    
-    
+    arcpy.env.workspace = os.path.dirname(input_wetland)
+
+
     # Create a feature layer from the clip polygon shapefile
     clip_polygon_layer = "clip_polygon_layer"
     arcpy.MakeFeatureLayer_management(input_clip_polygon, clip_polygon_layer)
@@ -39,7 +34,7 @@ def batch_clip(basin_shapefile, input_clip_polygon, output_directory):
             arcpy.SelectLayerByAttribute_management(clip_polygon_layer, "NEW_SELECTION", query)
             
             output_shapefile = os.path.join(clip_subfolder, f"{gage_id}_Wetland.shp")
-            arcpy.analysis.Clip(basin_shapefile, clip_polygon_layer, output_shapefile)
+            arcpy.analysis.Clip(input_wetland, clip_polygon_layer, output_shapefile)
             print(f"Clipped and saved: {output_shapefile}")
     
     arcpy.SelectLayerByAttribute_management(clip_polygon_layer, "CLEAR_SELECTION")
@@ -72,19 +67,29 @@ def batch_dissolve(input_folder, output_folder):
 
 
 basin_shapefile = r"Z:\NE_Basin\Basin_Characteristics\PreProcessing_1027\basins_final_merge.shp"
-wetland_shapefile = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Wetland_Local\Wetland_1027.shp"
+wetland_shapefile = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Wetland_Local\Processed\reproject\Wetland_1027.shp"
 output_folder = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Wetland_Tool"
 
 print("Input read. Start processing.")    
+
+    
+# Read the prefix 
+base_filename = os.path.basename(wetland_shapefile)
+prefix = base_filename.split('_')[1]
     
 # Create output subfolder if it doesn't exist
-clip_subfolder = os.path.join(output_folder, "dissolve")
-if not os.path.exists(clip_subfolder):
-    os.makedirs(clip_subfolder)
-batch_clip(basin_shapefile, wetland_shapefile, clip_subfolder)
+wetland_subfolder = os.path.join(output_folder, "Wetland_{prefix}")
+if not os.path.exists(wetland_subfolder):
+    os.makedirs(wetland_subfolder)
 
 # Create output subfolder if it doesn't exist
-dissolve_subfolder = os.path.join(output_folder, "dissolve")
+clip_subfolder = os.path.join(wetland_subfolder, "clip_{prefix}")
+if not os.path.exists(clip_subfolder):
+    os.makedirs(clip_subfolder)
+batch_clip(wetland_shapefile, basin_shapefile, clip_subfolder)
+
+# Create output subfolder if it doesn't exist
+dissolve_subfolder = os.path.join(wetland_subfolder, "dissolve_{prefix}")
 if not os.path.exists(dissolve_subfolder):
     os.makedirs(dissolve_subfolder)
 batch_dissolve(clip_subfolder,dissolve_subfolder)
