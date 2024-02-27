@@ -12,7 +12,7 @@ def SoilTypeKsat(soil_map_units_shp,basins_list_shp, output_folder):
     gdb_name = "Soil.gdb"
     gdb_path = os.path.join(output_folder, gdb_name)
     temp_folder = os.path.join(output_folder, "soil_temp")
-
+    
     if not arcpy.Exists(gdb_path):
         arcpy.CreateFileGDB_management(output_folder, gdb_name)
     if not os.path.exists(temp_folder):
@@ -70,18 +70,24 @@ def SoilTypeKsat(soil_map_units_shp,basins_list_shp, output_folder):
     # Update field names list to include the desired field names
     field_names = ["GID"]  # Start with GID and OtherSoilType
     print("unique_soil_types are", unique_soil_types)
+    '''
     for soil_type in unique_soil_types:
         if soil_type != ' ':
             field_name = f"{soil_type}"
             field_names.append(field_name)  # Remove SoilType_ prefix for other types
     field_names.append("ksat_weighted")  # Add ksat_weighted field
+    '''
+    
+    # Adding soil types fields
+    Soil_Type_fields = ['SoilType_A', 'SoilType_B', 'SoilType_C', 'SoilType_D', 'SoilType_A_D', 'SoilType_B_D', 'SoilType_C_D', 'OtherSoilTypes']
 
-    # Now, use these field names when creating fields and inserting data
-    for field_name in field_names[1:]:  # Skip 'GID' as it's already added
+    for field_name in Soil_Type_fields:  # Skip 'GID' as it's already added
         arcpy.AddField_management(table_path, field_name, "DOUBLE")
 
+    # Add ksat_weighted field
+    arcpy.AddField_management(table_path, "ksat_weighted", "DOUBLE")
+    
     print("Fields added to table:", time.ctime())  # Track progress
-    print("field_names are", field_names)
 
     # Populate the table
     with arcpy.da.InsertCursor(table_path, field_names) as cursor:
@@ -93,6 +99,16 @@ def SoilTypeKsat(soil_map_units_shp,basins_list_shp, output_folder):
             cursor.insertRow(row)
 
     print("Table populated with data:", time.ctime())  # Track progress
+    
+    # Update rows where soil type fields are not in the unique soil types
+    with arcpy.da.UpdateCursor(table_path, Soil_Type_fields) as cursor:
+        for row in cursor:
+            for i in range(len(row)):
+                if Soil_Type_fields[i] not in unique_soil_types:
+                    row[i] = 0  # Fill with 0 if soil type field not in unique soil types
+            cursor.updateRow(row)
+
+    print("Filled missing soil type fields with 0:", time.ctime())  # Track progress
 
 
 # Inputs
