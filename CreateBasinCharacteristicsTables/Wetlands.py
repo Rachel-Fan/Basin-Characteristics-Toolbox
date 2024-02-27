@@ -144,6 +144,8 @@ def create_national_wetland_table(basin_shapefile, output_gdb, dissolve_folder):
     with arcpy.da.InsertCursor(national_wetland_table, ["GID", "Wetland_Pctg", "LakePond_Pctg"]) as cursor:
         for gid, areas in gid_totals.items():
             total_area = gid_areas.get(gid, 0)  # Get total area for this GID
+            print('area of ', {gid}, 'is', areas["wetland"] )
+            print('total area is ', total_area)
             wetland_percentage = (areas["wetland"] / total_area) * 100 if total_area != 0 else 0
             lakepond_percentage = (areas["lakepond"] / total_area) * 100 if total_area != 0 else 0
             cursor.insertRow((gid, wetland_percentage, lakepond_percentage))
