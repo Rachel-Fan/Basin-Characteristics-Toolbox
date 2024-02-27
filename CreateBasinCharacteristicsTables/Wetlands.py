@@ -87,7 +87,7 @@ def add_area_field(input_folder):
 
     print("Process completed successfully.")
     
-def create_national_wetland_table(basin_shapefile, output_gdb):
+def create_national_wetland_table(basin_shapefile, output_gdb, dissolve_folder):
     # Create geodatabase if it doesn't exist
     if not arcpy.Exists(output_gdb):
         arcpy.CreateFileGDB_management(os.path.dirname(output_gdb), os.path.basename(output_gdb))
@@ -96,9 +96,38 @@ def create_national_wetland_table(basin_shapefile, output_gdb):
     national_wetland_table = os.path.join(output_gdb, "NationalWetland")
     if not arcpy.Exists(national_wetland_table):
         arcpy.CreateTable_management(output_gdb, "NationalWetland")
-        arcpy.AddField_management(national_wetland_table, "GID", "LONG")
+        arcpy.AddField_management(national_wetland_table, "GID", "TEXT")
         arcpy.AddField_management(national_wetland_table, "Wetland_Pctg", "DOUBLE")
         arcpy.AddField_management(national_wetland_table, "LakePond_Pctg", "DOUBLE")
+
+    # Get a list of shapefiles in the dissolve folder
+    dissolve_shapefiles = [f for f in os.listdir(dissolve_folder) if f.endswith(".shp")]
+
+    # Initialize dictionary to store area totals for each GID
+    gid_totals = {}
+
+    # Loop through each shapefile
+    for dissolve_shapefile in dissolve_shapefiles:
+        # Extract GID from the shapefile name
+        gid = dissolve_shapefile.split('_')[0]
+
+        # Initialize variables to store area totals for each type
+        wetland_area_total = 0
+        lakepond_area_total = 0
+
+        # Use SearchCursor to calculate total area for each type
+        with arcpy.da.SearchCursor(os.path.join(dissolve_folder, dissolve_shapefile), ["TYPE", "Area_SqMi"]) as cursor:
+            for row in cursor:
+                if row[0] == "Wetland":
+                    wetland_area_total += row[1]
+                elif row[0] == "LakePond":
+                    lakepond_area_total += row[1]
+
+        # Update dictionary with totals for this GID
+        gid_totals[gid] = {
+            "wetland": wetland_area_total,
+            "lakepond": lakepond_area_total
+        }
 
     # Calculate total area from basin_shapefile
     total_area = 0
@@ -108,22 +137,10 @@ def create_national_wetland_table(basin_shapefile, output_gdb):
 
     # Insert data into NationalWetland table
     with arcpy.da.InsertCursor(national_wetland_table, ["GID", "Wetland_Pctg", "LakePond_Pctg"]) as cursor:
-        with arcpy.da.SearchCursor(basin_shapefile, ["GID", "TDA_SqMi"]) as cursor_basin:
-            for row_basin in cursor_basin:
-                gid = row_basin[0]
-                total_area = row_basin[1]
-                wetland_area = 0
-                lakepond_area = 0
-                with arcpy.da.SearchCursor(basin_shapefile, ["GID", "WETLAND_TY", "Area_SqMi"], f"GID = {gid}") as cursor_wetland:
-                    for row_wetland in cursor_wetland:
-                        if "Wetland" in row_wetland[1]:
-                            wetland_area += row_wetland[2]
-                        elif "Lake" in row_wetland[1] or "Pond" in row_wetland[1]:
-                            lakepond_area += row_wetland[2]
-
-                wetland_percentage = (wetland_area / total_area) * 100
-                lakepond_percentage = (lakepond_area / total_area) * 100
-                cursor.insertRow((gid, wetland_percentage, lakepond_percentage))
+        for gid, areas in gid_totals.items():
+            wetland_percentage = (areas["wetland"] / total_area) * 100
+            lakepond_percentage = (areas["lakepond"] / total_area) * 100
+            cursor.insertRow((gid, wetland_percentage, lakepond_percentage))
 
     print("Process completed successfully.")
 
