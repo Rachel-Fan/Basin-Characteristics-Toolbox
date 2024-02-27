@@ -82,7 +82,7 @@ def add_area_field(input_folder):
         arcpy.AddField_management(shapefile_path, 'Area_SqMi', 'DOUBLE')
 
         # Calculate area in square miles
-        arcpy.CalculateGeometryAttributes_management(shapefile_path, [['Area_SqMi', 'AREA']], area_unit='SQUARE_MILES', coordinate_system='26852')
+        arcpy.CalculateGeometryAttributes_management(shapefile_path, [['Area_SqMi', 'AREA']], area_unit='SQUARE_MILES_INT', coordinate_system='26852')
         print(f"Area calculated for {shapefile}")
 
     print("Process completed successfully.")
@@ -97,8 +97,8 @@ def create_national_wetland_table(basin_shapefile, output_gdb):
     if not arcpy.Exists(national_wetland_table):
         arcpy.CreateTable_management(output_gdb, "NationalWetland")
         arcpy.AddField_management(national_wetland_table, "GID", "LONG")
-        arcpy.AddField_management(national_wetland_table, "Wetland_Percentage", "DOUBLE")
-        arcpy.AddField_management(national_wetland_table, "LakePond_Percentage", "DOUBLE")
+        arcpy.AddField_management(national_wetland_table, "Wetland_Pctg", "DOUBLE")
+        arcpy.AddField_management(national_wetland_table, "LakePond_Pctg", "DOUBLE")
 
     # Calculate total area from basin_shapefile
     total_area = 0
@@ -107,7 +107,7 @@ def create_national_wetland_table(basin_shapefile, output_gdb):
             total_area += row[0]
 
     # Insert data into NationalWetland table
-    with arcpy.da.InsertCursor(national_wetland_table, ["GID", "Wetland_Percentage", "LakePond_Percentage"]) as cursor:
+    with arcpy.da.InsertCursor(national_wetland_table, ["GID", "Wetland_Pctg", "LakePond_Pctg"]) as cursor:
         with arcpy.da.SearchCursor(basin_shapefile, ["GID", "TDA_SqMi"]) as cursor_basin:
             for row_basin in cursor_basin:
                 gid = row_basin[0]
@@ -127,7 +127,7 @@ def create_national_wetland_table(basin_shapefile, output_gdb):
 
     print("Process completed successfully.")
 
-basin_shapefile = r"Z:\NE_Basin\Basin_Characteristics\PreProcessing_1012\basins_final_merge.shp"
+basin_shapefile = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Input_Basins\1012\basins_final_merge.shp"
 wetland_shapefile = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Wetland_Local\Processed\reproject\1012_merged.shp"
 output_folder = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Wetland_Tool\1012"
 
@@ -137,18 +137,18 @@ print("Input read. Start processing.")
 base_filename = os.path.basename(wetland_shapefile)
 
 # Split the filename by underscore
-prefix = base_filename.split('_')[1]
-
+prefix = base_filename.split('_')[0]
+print('prefix is ', prefix)
 
 
    
 # Create output subfolder if it doesn't exist
-wetland_subfolder = os.path.join(output_folder, "Wetland_{prefix}")
+wetland_subfolder = os.path.join(output_folder, f"Wetland_{prefix}")
 if not os.path.exists(wetland_subfolder):
     os.makedirs(wetland_subfolder)
 
 # Create output subfolder if it doesn't exist
-clip_subfolder = os.path.join(wetland_subfolder, "clip_{prefix}")
+clip_subfolder = os.path.join(wetland_subfolder, f"clip_{prefix}")
 if not os.path.exists(clip_subfolder):
     os.makedirs(clip_subfolder)
 batch_clip(wetland_shapefile, basin_shapefile, clip_subfolder)
@@ -157,7 +157,7 @@ current_time = time.strftime("%m-%d %X",time.localtime())
 print(current_time)
 
 # Create output subfolder if it doesn't exist
-dissolve_subfolder = os.path.join(wetland_subfolder, "dissolve_{prefix}")
+dissolve_subfolder = os.path.join(wetland_subfolder, f"dissolve_{prefix}")
 if not os.path.exists(dissolve_subfolder):
     os.makedirs(dissolve_subfolder)
 batch_dissolve(clip_subfolder,dissolve_subfolder)
