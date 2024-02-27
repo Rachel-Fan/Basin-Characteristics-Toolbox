@@ -88,9 +88,6 @@ def add_area_field(input_folder):
     print("Process completed successfully.")
     
 def create_national_wetland_table(basin_shapefile, output_gdb, dissolve_folder):
-    # Create geodatabase if it doesn't exist
-    if not arcpy.Exists(output_gdb):
-        arcpy.CreateFileGDB_management(os.path.dirname(output_gdb), os.path.basename(output_gdb))
     
     # Create NationalWetland table
     national_wetland_table = os.path.join(output_gdb, "NationalWetland")
@@ -138,6 +135,8 @@ def create_national_wetland_table(basin_shapefile, output_gdb, dissolve_folder):
     # Insert data into NationalWetland table
     with arcpy.da.InsertCursor(national_wetland_table, ["GID", "Wetland_Pctg", "LakePond_Pctg"]) as cursor:
         for gid, areas in gid_totals.items():
+            print('area of ', {gid}, 'is', areas["wetland"] )
+            print('total area is ', total_area)
             wetland_percentage = (areas["wetland"] / total_area) * 100
             lakepond_percentage = (areas["lakepond"] / total_area) * 100
             cursor.insertRow((gid, wetland_percentage, lakepond_percentage))
@@ -188,7 +187,7 @@ add_area_field(dissolve_subfolder)
 gdb_path = os.path.join(wetland_subfolder, f"NationalWetland_{prefix}.gdb")
 if not arcpy.Exists(gdb_path):
     arcpy.CreateFileGDB_management(wetland_subfolder, f"NationalWetland_{prefix}.gdb")
-create_national_wetland_table(basin_shapefile, wetland_subfolder)
+create_national_wetland_table(basin_shapefile, gdb_path,dissolve_subfolder)
 print("create_national_wetland_table Done at")
 current_time = time.strftime("%m-%d %X",time.localtime())
 print(current_time)
