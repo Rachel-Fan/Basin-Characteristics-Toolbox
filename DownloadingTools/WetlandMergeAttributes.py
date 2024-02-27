@@ -2,24 +2,28 @@ import arcpy
 import os
 import time
 
-def merge_shapfiles_by_prefix(input_folder, output_folder):
+def merge_shapfiles_by_prefix(before_merge_folder, output_folder):
     shapefile_dict = {}
     
+    # Create the 'merged' folder if it doesn't exist
+    merged_folder = os.path.join(output_folder, "merged")
+    if not os.path.exists(merged_folder):
+        os.makedirs(merged_folder)
     
-    for filename in os.listdir(input_folder):
+    for filename in os.listdir(before_merge_folder):
         if filename.endswith(".shp"):
             # Extract the prefix (first four digits) from the filename
             prefix = filename[:4]
             # Check if trhe prefix already exists in the dictionary
             if prefix in shapefile_dict:
                 # Append
-                shapefile_dict[prefix].append(os.path.join(input_folder, filename))
+                shapefile_dict[prefix].append(os.path.join(before_merge_folder, filename))
                 
             else:
-                shapefile_dict[prefix] = [os.path.join(input_folder,filename)]
+                shapefile_dict[prefix] = [os.path.join(before_merge_folder,filename)]
                 
     for prefix, shapefiles in shapefile_dict.items():
-        output_merged_shapefile = os.path.join(output_folder, f"{prefix}_merged.shp")
+        output_merged_shapefile = os.path.join(merged_folder, f"{prefix}_merged.shp")
         arcpy.Merge_management(shapefiles,output_merged_shapefile)
         
         print("shapefiles with {prefix} are merged")
@@ -38,7 +42,7 @@ arcpy.CheckOutExtension("Spatial")
 arcpy.env.overwriteOutput = True
 
 # Set input and output folders
-input_folder = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Wetland_Local\ToolTest"
+before_merge_folder = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Wetland_Local\ToolTest"
 output_folder = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Wetland_Local\Processed"
 
 # Set the coordinate system
@@ -50,10 +54,10 @@ if not os.path.exists(reproject_folder):
     os.makedirs(reproject_folder)
 
 # Iterate through each shapefile in the input folder
-for filename in os.listdir(input_folder):
+for filename in os.listdir(merged_folder):
     if filename.endswith(".shp"):
         # Define the full paths
-        input_shapefile = os.path.join(input_folder, filename)
+        input_shapefile = os.path.join(merged_folder, filename)
         output_shapefile = os.path.join(reproject_folder, filename)
         print('Input shapefile is selected', input_shapefile)
 

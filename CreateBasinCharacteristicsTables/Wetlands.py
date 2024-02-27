@@ -19,9 +19,14 @@ def batch_clip(input_wetland, input_clip_polygon, output_directory):
     Creates a clipped shapefile for each polygon based on its GID.
     """
     # Set the workspace to the directory of the input ecoregion shapefile
-    arcpy.env.workspace = os.path.dirname(input_wetland)
-
-
+    arcpy.env.workspace = os.path.dirname(basin_shapefile)
+    
+    # Ensure the output directory exists
+    if not os.path.exists(output_directory):
+        os.makedirs(output_directory)
+    
+    
+    
     # Create a feature layer from the clip polygon shapefile
     clip_polygon_layer = "clip_polygon_layer"
     arcpy.MakeFeatureLayer_management(input_clip_polygon, clip_polygon_layer)
@@ -64,19 +69,79 @@ def batch_dissolve(input_folder, output_folder):
     except Exception as e:
         arcpy.AddError(str(e))
 
+def add_area_field(input_folder):
+    # List all shapefiles in the input folder
+    shapefiles = [f for f in os.listdir(input_folder) if f.endswith('.shp')]
 
+    # Loop through each shapefile
+    for shapefile in shapefiles:
+        # Create a full path to the shapefile
+        shapefile_path = os.path.join(input_folder, shapefile)
+
+        # Add 'Area_SqMi' field
+        arcpy.AddField_management(shapefile_path, 'Area_SqMi', 'DOUBLE')
+
+        # Calculate area in square miles
+        arcpy.CalculateGeometryAttributes_management(shapefile_path, [['Area_SqMi', 'AREA']], area_unit='SQUARE_MILES', coordinate_system='26852')
+        print(f"Area calculated for {shapefile}")
+
+    print("Process completed successfully.")
+    
+def create_national_wetland_table(basin_shapefile, output_gdb):
+    # Create geodatabase if it doesn't exist
+    if not arcpy.Exists(output_gdb):
+        arcpy.CreateFileGDB_management(os.path.dirname(output_gdb), os.path.basename(output_gdb))
+    
+    # Create NationalWetland table
+    national_wetland_table = os.path.join(output_gdb, "NationalWetland")
+    if not arcpy.Exists(national_wetland_table):
+        arcpy.CreateTable_management(output_gdb, "NationalWetland")
+        arcpy.AddField_management(national_wetland_table, "GID", "LONG")
+        arcpy.AddField_management(national_wetland_table, "Wetland_Percentage", "DOUBLE")
+        arcpy.AddField_management(national_wetland_table, "LakePond_Percentage", "DOUBLE")
+
+    # Calculate total area from basin_shapefile
+    total_area = 0
+    with arcpy.da.SearchCursor(basin_shapefile, ["TDA_SqMi"]) as cursor:
+        for row in cursor:
+            total_area += row[0]
+
+    # Insert data into NationalWetland table
+    with arcpy.da.InsertCursor(national_wetland_table, ["GID", "Wetland_Percentage", "LakePond_Percentage"]) as cursor:
+        with arcpy.da.SearchCursor(basin_shapefile, ["GID", "TDA_SqMi"]) as cursor_basin:
+            for row_basin in cursor_basin:
+                gid = row_basin[0]
+                total_area = row_basin[1]
+                wetland_area = 0
+                lakepond_area = 0
+                with arcpy.da.SearchCursor(basin_shapefile, ["GID", "WETLAND_TY", "Area_SqMi"], f"GID = {gid}") as cursor_wetland:
+                    for row_wetland in cursor_wetland:
+                        if "Wetland" in row_wetland[1]:
+                            wetland_area += row_wetland[2]
+                        elif "Lake" in row_wetland[1] or "Pond" in row_wetland[1]:
+                            lakepond_area += row_wetland[2]
+
+                wetland_percentage = (wetland_area / total_area) * 100
+                lakepond_percentage = (lakepond_area / total_area) * 100
+                cursor.insertRow((gid, wetland_percentage, lakepond_percentage))
+
+    print("Process completed successfully.")
 
 basin_shapefile = r"Z:\NE_Basin\Basin_Characteristics\PreProcessing_1027\basins_final_merge.shp"
-wetland_shapefile = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Wetland_Local\Processed\reproject\Wetland_1027.shp"
+wetland_shapefile = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Wetland_Local\Wetland_1027.shp"
 output_folder = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Wetland_Tool"
 
-print("Input read. Start processing.")    
+print("Input read. Start processing.") 
 
-    
-# Read the prefix 
+# Get the base filename
 base_filename = os.path.basename(wetland_shapefile)
+
+# Split the filename by underscore
 prefix = base_filename.split('_')[1]
-    
+
+
+
+   
 # Create output subfolder if it doesn't exist
 wetland_subfolder = os.path.join(output_folder, "Wetland_{prefix}")
 if not os.path.exists(wetland_subfolder):
@@ -93,3 +158,9 @@ dissolve_subfolder = os.path.join(wetland_subfolder, "dissolve_{prefix}")
 if not os.path.exists(dissolve_subfolder):
     os.makedirs(dissolve_subfolder)
 batch_dissolve(clip_subfolder,dissolve_subfolder)
+
+# Create the file geodatabase
+gdb_path = os.path.join(wetland_subfolder, f"NationalWetland_{prefix}.gdb")
+if not arcpy.Exists(gdb_path):
+    arcpy.CreateFileGDB_management(wetland_subfolder, f"NationalWetland_{prefix}.gdb")
+create_national_wetland_table(basin_shapefile, wetland_subfolder)
