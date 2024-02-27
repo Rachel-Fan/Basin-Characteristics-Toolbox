@@ -127,9 +127,9 @@ def create_national_wetland_table(basin_shapefile, output_gdb):
 
     print("Process completed successfully.")
 
-basin_shapefile = r"Z:\NE_Basin\Basin_Characteristics\PreProcessing_1027\basins_final_merge.shp"
-wetland_shapefile = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Wetland_Local\Wetland_1027.shp"
-output_folder = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Wetland_Tool"
+basin_shapefile = r"Z:\NE_Basin\Basin_Characteristics\PreProcessing_1012\basins_final_merge.shp"
+wetland_shapefile = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Wetland_Local\Processed\reproject\1012_merged.shp"
+output_folder = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Wetland_Tool\1012"
 
 print("Input read. Start processing.") 
 
@@ -152,15 +152,30 @@ clip_subfolder = os.path.join(wetland_subfolder, "clip_{prefix}")
 if not os.path.exists(clip_subfolder):
     os.makedirs(clip_subfolder)
 batch_clip(wetland_shapefile, basin_shapefile, clip_subfolder)
+print("batch_clip Done at")
+current_time = time.strftime("%m-%d %X",time.localtime())
+print(current_time)
 
 # Create output subfolder if it doesn't exist
 dissolve_subfolder = os.path.join(wetland_subfolder, "dissolve_{prefix}")
 if not os.path.exists(dissolve_subfolder):
     os.makedirs(dissolve_subfolder)
 batch_dissolve(clip_subfolder,dissolve_subfolder)
+print("batch_dissolve Done at")
+current_time = time.strftime("%m-%d %X",time.localtime())
+print(current_time)
+
+add_area_field(dissolve_subfolder)
 
 # Create the file geodatabase
 gdb_path = os.path.join(wetland_subfolder, f"NationalWetland_{prefix}.gdb")
 if not arcpy.Exists(gdb_path):
     arcpy.CreateFileGDB_management(wetland_subfolder, f"NationalWetland_{prefix}.gdb")
 create_national_wetland_table(basin_shapefile, wetland_subfolder)
+print("create_national_wetland_table Done at")
+current_time = time.strftime("%m-%d %X",time.localtime())
+print(current_time)
+
+print("Tool Done at")
+current_time = time.strftime("%m-%d %X",time.localtime())
+print(current_time)

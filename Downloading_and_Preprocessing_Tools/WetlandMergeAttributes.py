@@ -42,8 +42,8 @@ arcpy.CheckOutExtension("Spatial")
 arcpy.env.overwriteOutput = True
 
 # Set input and output folders
-before_merge_folder = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Wetland_Local\ToolTest"
-output_folder = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Wetland_Local\Processed"
+input_folder = r"D:\NE\Wetland\Preprocessing\merged"
+output_folder = r"D:\NE\Wetland\Preprocessing"
 
 # Set the coordinate system
 output_coordinate_system = arcpy.SpatialReference(26852)  # WKID 26852 for NAD83 StatePlane Nebraska FIPS 2600
@@ -54,10 +54,10 @@ if not os.path.exists(reproject_folder):
     os.makedirs(reproject_folder)
 
 # Iterate through each shapefile in the input folder
-for filename in os.listdir(merged_folder):
+for filename in os.listdir(input_folder):
     if filename.endswith(".shp"):
         # Define the full paths
-        input_shapefile = os.path.join(merged_folder, filename)
+        input_shapefile = os.path.join(input_folder, filename)
         output_shapefile = os.path.join(reproject_folder, filename)
         print('Input shapefile is selected', input_shapefile)
 
