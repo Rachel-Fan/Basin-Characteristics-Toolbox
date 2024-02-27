@@ -88,6 +88,9 @@ def add_area_field(input_folder):
     print("Process completed successfully.")
     
 def create_national_wetland_table(basin_shapefile, output_gdb, dissolve_folder):
+    # Create geodatabase if it doesn't exist
+    if not arcpy.Exists(output_gdb):
+        arcpy.CreateFileGDB_management(os.path.dirname(output_gdb), os.path.basename(output_gdb))
     
     # Create NationalWetland table
     national_wetland_table = os.path.join(output_gdb, "NationalWetland")
@@ -126,22 +129,27 @@ def create_national_wetland_table(basin_shapefile, output_gdb, dissolve_folder):
             "lakepond": lakepond_area_total
         }
 
-    # Calculate total area from basin_shapefile
-    total_area = 0
-    with arcpy.da.SearchCursor(basin_shapefile, ["TDA_SqMi"]) as cursor:
+    # Calculate total area for each GID from basin_shapefile
+    gid_areas = {}
+    with arcpy.da.SearchCursor(basin_shapefile, ["GID", "TDA_SqMi"]) as cursor:
         for row in cursor:
-            total_area += row[0]
+            gid = row[0]
+            area = row[1]
+            if gid not in gid_areas:
+                gid_areas[gid] = area
+            else:
+                gid_areas[gid] += area
 
     # Insert data into NationalWetland table
     with arcpy.da.InsertCursor(national_wetland_table, ["GID", "Wetland_Pctg", "LakePond_Pctg"]) as cursor:
         for gid, areas in gid_totals.items():
-            print('area of ', {gid}, 'is', areas["wetland"] )
-            print('total area is ', total_area)
-            wetland_percentage = (areas["wetland"] / total_area) * 100
-            lakepond_percentage = (areas["lakepond"] / total_area) * 100
+            total_area = gid_areas.get(gid, 0)  # Get total area for this GID
+            wetland_percentage = (areas["wetland"] / total_area) * 100 if total_area != 0 else 0
+            lakepond_percentage = (areas["lakepond"] / total_area) * 100 if total_area != 0 else 0
             cursor.insertRow((gid, wetland_percentage, lakepond_percentage))
 
     print("Process completed successfully.")
+
 
 basin_shapefile = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Input_Basins\1012\basins_final_merge.shp"
 wetland_shapefile = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Wetland_Local\Processed\reproject\1012_merged.shp"
