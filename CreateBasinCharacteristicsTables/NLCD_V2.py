@@ -176,12 +176,16 @@ def create_and_populate_NLCD_table(NLCD_Category_folder, output_folder):
 
 
 
-input_raster = r"C:\Users\Rachel\Documents\ArcGIS Pro 3.2\Projects\NE_Basin\Basin_Characteristics\SourceData\NLCD_DEM_Extent.tif"
-input_shp = r"C:\Users\Rachel\Documents\ArcGIS Pro 3.2\Projects\NE_Basin\Basin_Characteristics\1012\basins_final_merge.shp"
-output_folder = r"C:\Users\Rachel\Documents\ArcGIS Pro 3.2\Projects\NE_Basin\Basin_Characteristics\NLCD_V2"
+input_raster = r"D:\NE\Basin_Characteristics\SourceData\NLCD_2021_NE_State_DEM_Extent.tif"
+input_shp = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\Input_Basins\1012\basins_final_merge.shp"
+output_folder = r"C:\Users\rfan\Documents\ArcGIS\Projects\NeDNR_Regression\NLCD_V2"
 
 # Create tif output folder if it does not exist
-tif_folder = os.path.join(output_folder, "NLCD_TIF")
+NLCD_folder = os.path.join(output_folder, "NLCD")
+if not os.path.exists(NLCD_folder):
+    os.makedirs(NLCD_folder)
+# Create tif output folder if it does not exist
+tif_folder = os.path.join(NLCD_folder, "NLCD_TIF")
 if not os.path.exists(tif_folder):
     os.makedirs(tif_folder)
 batch_clip_raster(input_raster, input_shp, tif_folder)
@@ -189,7 +193,7 @@ print("Batch Clip raster Done at", time.ctime())  # Track progress
 print('****************************************')
 
 # Create shp output folder if it does not exist
-shp_folder = os.path.join(output_folder, "NLCD_shp")
+shp_folder = os.path.join(NLCD_folder, "NLCD_shp")
 if not os.path.exists(shp_folder):
     os.makedirs(shp_folder)
 tiff_to_shapefile(tif_folder, shp_folder)
@@ -197,7 +201,7 @@ print("Batch Clip raster Done at", time.ctime())  # Track progress
 print('****************************************')
 
 # Create shp output folder if it does not exist
-shp_folder = os.path.join(output_folder, "NLCD_shp")
+shp_folder = os.path.join(NLCD_folder, "NLCD_shp")
 if not os.path.exists(shp_folder):
     os.makedirs(shp_folder)
 tiff_to_shapefile(tif_folder, shp_folder)
@@ -205,7 +209,7 @@ print("Tiff to shapefiles Done at", time.ctime())  # Track progress
 print('****************************************')
 
 # Create category output folder if it does not exist
-cat_folder = os.path.join(output_folder, "NLCD_category")
+cat_folder = os.path.join(NLCD_folder, "NLCD_category")
 if not os.path.exists(cat_folder):
     os.makedirs(cat_folder)
 dissolve_and_categorize_shapefiles(shp_folder, cat_folder, )
@@ -215,7 +219,7 @@ print('****************************************')
 
 # Create output NLCD table with categories
 
-create_and_populate_NLCD_table(cat_folder, output_folder)
+create_and_populate_NLCD_table(cat_folder, NLCD_folder)
 print("NLCD table populated at", time.ctime())  # Track progress
 print('****************************************')
 
